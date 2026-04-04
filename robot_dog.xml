@@ -1,0 +1,245 @@
+<!-- 
+  Robot Dog MJCF Model — RapidPower Mini (approximate)
+  
+  Coordinate system:
+    X = forward
+    Y = left  
+    Z = up
+  
+  The real robot is roughly cell-phone-sized. All dimensions in meters.
+  These are rough starting values — we'll tune after measuring the real hardware.
+-->
+<mujoco model="toy_dog">
+
+  <!-- 
+    COMPILER SETTINGS
+    - angle="degree": lets us specify joint limits in degrees instead of radians
+    - autolimits="true": if a joint has a range, MuJoCo auto-enables the limit
+  -->
+  <compiler angle="degree" autolimits="true"/>
+
+  <!-- 
+    SIMULATION OPTIONS
+    - timestep: physics step size. 0.002s = 500Hz is standard for contact-rich sims.
+      Your policy will run at 50Hz (every 10th physics step).
+    - gravity: earth standard, pointing down (-Z)
+  -->
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <!--
+    DEFAULT VALUES
+    These apply to all joints/geoms unless overridden. Saves repetition.
+    
+    Joint damping: resistance to motion (like friction in the joint).
+    Too low = jittery, too high = sluggish. We'll tune this.
+    
+    Geom friction: (sliding, torsional, rolling). The sliding friction 
+    between feet and ground is critical — too low and the dog slides 
+    around, too high and it can't waddle. Starting with 0.8.
+    
+    Geom condim=3: enables sliding + torsional friction (no rolling).
+  -->
+  <default>
+    <joint damping="0.02" armature="0.01"/>
+    <geom friction="0.8 0.005 0.001" condim="3" rgba="0.6 0.6 0.6 1"/>
+    <motor ctrllimited="true" ctrlrange="-1 1"/>
+  </default>
+
+  <!--
+    ASSETS
+    We define materials here so we can color things meaningfully.
+  -->
+  <asset>
+    <material name="body_mat" rgba="0.3 0.3 0.35 1"/>
+    <material name="leg_mat" rgba="0.8 0.4 0.2 1"/>
+    <material name="foot_mat" rgba="0.2 0.2 0.2 1"/>
+    <material name="ground_mat" rgba="0.9 0.9 0.85 1"/>
+  </asset>
+
+  <!--
+    WORLDBODY
+    Everything physical lives here. The hierarchy matters:
+    body → (geom + joint + child bodies)
+    
+    A body's position/orientation is relative to its parent.
+  -->
+  <worldbody>
+    <!-- Ground plane. The robot needs something to walk on. -->
+    <geom name="floor" type="plane" size="2 2 0.1" material="ground_mat"/>
+
+    <!-- 
+      Light so we can see things in the viewer.
+      diffuse/specular control brightness.
+    -->
+    <light pos="0 0 1.5" dir="0 0 -1" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3"/>
+
+    <!--
+      ROBOT BODY (the torso)
+      
+      pos="0 0 0.06": starts 6cm above ground. With ~4cm legs, 
+      this gives a bit of clearance. The sim will settle under gravity.
+      
+      The body is a box: 10cm long, 5cm wide, 2.5cm tall.
+      Mass is set explicitly — real robot is maybe 100-150g total,
+      body is the bulk of that.
+    -->
+    <body name="torso" pos="0 0 0.06">
+      <!-- 
+        freejoint: the torso floats freely in space (6 DOF).
+        This is what makes it a mobile robot vs a fixed arm.
+        Without this, the body would be welded to the world.
+      -->
+      <freejoint name="root"/>
+
+      <!-- Inertial properties. mass + diagonal inertia tensor. -->
+      <inertial pos="0 0 0" mass="0.10" 
+                diaginertia="0.00002 0.00005 0.00005"/>
+      
+      <!-- Visual body shape -->
+      <geom name="torso_geom" type="box" size="0.05 0.025 0.0125" 
+            material="body_mat"/>
+
+      <!-- 
+        IMU site: a reference frame for the gyro and accelerometer sensors.
+        Sites are massless points attached to a body — they just define 
+        a location and orientation for sensors or other references.
+        This is where the MPU6050 would sit on the real robot.
+      -->
+      <site name="imu_site" pos="0 0 0" size="0.005"/>
+
+      <!--
+        FRONT-LEFT LEG
+        
+        pos: attached at front-left corner of the body.
+          X = +0.04 (near front edge of the 10cm body)
+          Y = +0.025 (at left edge)
+          Z = -0.0125 (bottom of body)
+        
+        The joint is a hinge around the Y axis = fore-aft swing.
+        range="-15 15": limits swing to ±15° from neutral (~30° total arc).
+        Your notes say ~20° arc, so we're in the ballpark. Will tune.
+        
+        The leg is a capsule (cylinder with rounded ends) pointing 
+        straight down. size="0.006 0.02" means radius=6mm, half-length=20mm,
+        so total leg length ~4cm including the rounded caps.
+        
+        pos="0 0 -0.02": the capsule center is 2cm below the joint,
+        so the foot reaches ~4cm below the joint.
+      -->
+      <body name="leg_fl" pos="0.04 0.025 -0.0125">
+        <joint name="joint_fl" type="hinge" axis="0 1 0" 
+               range="-15 15"/>
+        <inertial pos="0 0 -0.02" mass="0.008" 
+                  diaginertia="0.0000005 0.0000005 0.0000001"/>
+        <geom name="leg_fl_geom" type="capsule" size="0.006 0.02" 
+              pos="0 0 -0.02" material="leg_mat"/>
+        <!-- 
+          Foot: a small sphere at the bottom of the leg.
+          Higher friction than the leg — this is what grips the ground.
+        -->
+        <geom name="foot_fl" type="sphere" size="0.007" 
+              pos="0 0 -0.04" material="foot_mat" 
+              friction="1.0 0.005 0.001"/>
+      </body>
+
+      <!-- FRONT-RIGHT LEG (mirror of FL across Y axis) -->
+      <body name="leg_fr" pos="0.04 -0.025 -0.0125">
+        <joint name="joint_fr" type="hinge" axis="0 1 0" 
+               range="-15 15"/>
+        <inertial pos="0 0 -0.02" mass="0.008" 
+                  diaginertia="0.0000005 0.0000005 0.0000001"/>
+        <geom name="leg_fr_geom" type="capsule" size="0.006 0.02" 
+              pos="0 0 -0.02" material="leg_mat"/>
+        <geom name="foot_fr" type="sphere" size="0.007" 
+              pos="0 0 -0.04" material="foot_mat"
+              friction="1.0 0.005 0.001"/>
+      </body>
+
+      <!-- REAR-LEFT LEG -->
+      <body name="leg_rl" pos="-0.04 0.025 -0.0125">
+        <joint name="joint_rl" type="hinge" axis="0 1 0" 
+               range="-15 15"/>
+        <inertial pos="0 0 -0.02" mass="0.008" 
+                  diaginertia="0.0000005 0.0000005 0.0000001"/>
+        <geom name="leg_rl_geom" type="capsule" size="0.006 0.02" 
+              pos="0 0 -0.02" material="leg_mat"/>
+        <geom name="foot_rl" type="sphere" size="0.007" 
+              pos="0 0 -0.04" material="foot_mat"
+              friction="1.0 0.005 0.001"/>
+      </body>
+
+      <!-- REAR-RIGHT LEG -->
+      <body name="leg_rr" pos="-0.04 -0.025 -0.0125">
+        <joint name="joint_rr" type="hinge" axis="0 1 0" 
+               range="-15 15"/>
+        <inertial pos="0 0 -0.02" mass="0.008" 
+                  diaginertia="0.0000005 0.0000005 0.0000001"/>
+        <geom name="leg_rr_geom" type="capsule" size="0.006 0.02" 
+              pos="0 0 -0.02" material="leg_mat"/>
+        <geom name="foot_rr" type="sphere" size="0.007" 
+              pos="0 0 -0.04" material="foot_mat"
+              friction="1.0 0.005 0.001"/>
+      </body>
+
+    </body>
+  </worldbody>
+
+  <!--
+    ACTUATORS
+    
+    These define how we control the joints. Each motor maps a control 
+    signal in [-1, 1] to a torque on the joint.
+    
+    gear="0.1": scales the control signal to torque. gear=0.1 means
+    ctrl=1.0 produces 0.1 Nm of torque. These are tiny motors on a 
+    tiny robot, so we keep this small. Will need tuning.
+    
+    For bang-bang control (matching the real hardware), the policy 
+    would output -1 or +1. For proportional/PWM control, it outputs 
+    continuous values in [-1, 1].
+    
+    We'll start with continuous control in sim (easier for RL to learn)
+    and can quantize to bang-bang later as a domain randomization step.
+  -->
+  <actuator>
+    <motor name="motor_fl" joint="joint_fl" gear="0.1"/>
+    <motor name="motor_fr" joint="joint_fr" gear="0.1"/>
+    <motor name="motor_rl" joint="joint_rl" gear="0.1"/>
+    <motor name="motor_rr" joint="joint_rr" gear="0.1"/>
+  </actuator>
+
+  <!--
+    SENSORS
+    
+    These let us read back state from the simulation — analogous to 
+    the real sensors on the robot.
+    
+    jointpos: potentiometer readings (4 values)
+    jointvel: joint angular velocities (4 values, derived from pot in real life)
+    gyro: MPU6050 gyroscope (3-axis angular velocity of the body)
+    accelerometer: MPU6050 accelerometer (3-axis linear acceleration)
+    framequat: body orientation as quaternion — useful for reward computation
+                even if we don't feed it directly to the policy
+    
+    Together the jointpos + jointvel + gyro + accelerometer give us 
+    4 + 4 + 3 + 3 = 14 observation dimensions, matching your project plan.
+  -->
+  <sensor>
+    <jointpos name="pos_fl" joint="joint_fl"/>
+    <jointpos name="pos_fr" joint="joint_fr"/>
+    <jointpos name="pos_rl" joint="joint_rl"/>
+    <jointpos name="pos_rr" joint="joint_rr"/>
+
+    <jointvel name="vel_fl" joint="joint_fl"/>
+    <jointvel name="vel_fr" joint="joint_fr"/>
+    <jointvel name="vel_rl" joint="joint_rl"/>
+    <jointvel name="vel_rr" joint="joint_rr"/>
+
+    <gyro name="body_gyro" site="imu_site"/>
+    <accelerometer name="body_acc" site="imu_site"/>
+
+    <!-- Orientation for reward computation / logging -->
+    <framequat name="body_quat" objtype="body" objname="torso"/>
+  </sensor>
+
+</mujoco>
