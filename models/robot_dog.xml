@@ -110,73 +110,66 @@
       <!--
         FRONT-LEFT LEG
         
-        pos: attached at front-left corner of the body.
-          X = +0.04 (near front edge of the 10cm body)
-          Y = +0.025 (at left edge)
-          Z = -0.0125 (bottom of body)
+        Joint pivot is at the body centerline (Z=0), matching the real
+        robot where the axle goes through the middle of the body.
         
-        The joint is a hinge around the Y axis = fore-aft swing.
-        range="-15 15": limits swing to ±15° from neutral (~30° total arc).
-        Your notes say ~20° arc, so we're in the ballpark. Will tune.
+        No range attribute = full 360° rotation. The real legs can 
+        spin all the way around. The RL policy can discover upside-down
+        walking on its own.
         
-        The leg is a capsule (cylinder with rounded ends) pointing 
-        straight down. size="0.006 0.02" means radius=6mm, half-length=20mm,
-        so total leg length ~4cm including the rounded caps.
-        
-        pos="0 0 -0.02": the capsule center is 2cm below the joint,
-        so the foot reaches ~4cm below the joint.
+        Legs are flat boxes instead of cylinders — closer to the real 
+        plastic leg shape.
       -->
-      <body name="leg_fl" pos="0.04 0.025 -0.0125">
-        <joint name="joint_fl" type="hinge" axis="0 1 0" 
-               range="-15 15"/>
+      <!--
+        Leg pivot is at body center (Z=0), not the bottom edge.
+        The real robot's axle goes through the middle of the body.
+        No joint range = unlimited rotation (full 360°).
+        Leg is a flat box: thin fore-aft, wider side-to-side.
+        size="0.008 0.003 0.02" = 6mm x 16mm x 40mm total.
+      -->
+      <body name="leg_fl" pos="0.04 0.028 0">
+        <joint name="joint_fl" type="hinge" axis="0 1 0"/>
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
-        <geom name="leg_fl_geom" type="capsule" size="0.006 0.02" 
+        <geom name="leg_fl_geom" type="box" size="0.008 0.003 0.02" 
               pos="0 0 -0.02" material="leg_mat"/>
-        <!-- 
-          Foot: a small sphere at the bottom of the leg.
-          Higher friction than the leg — this is what grips the ground.
-        -->
-        <geom name="foot_fl" type="sphere" size="0.007" 
+        <geom name="foot_fl" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat" 
               friction="1.0 0.005 0.001"/>
       </body>
 
       <!-- FRONT-RIGHT LEG (mirror of FL across Y axis) -->
-      <body name="leg_fr" pos="0.04 -0.025 -0.0125">
-        <joint name="joint_fr" type="hinge" axis="0 1 0" 
-               range="-15 15"/>
+      <body name="leg_fr" pos="0.04 -0.028 0">
+        <joint name="joint_fr" type="hinge" axis="0 1 0"/>
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
-        <geom name="leg_fr_geom" type="capsule" size="0.006 0.02" 
+        <geom name="leg_fr_geom" type="box" size="0.008 0.003 0.02" 
               pos="0 0 -0.02" material="leg_mat"/>
-        <geom name="foot_fr" type="sphere" size="0.007" 
+        <geom name="foot_fr" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat"
               friction="1.0 0.005 0.001"/>
       </body>
 
       <!-- REAR-LEFT LEG -->
-      <body name="leg_rl" pos="-0.04 0.025 -0.0125">
-        <joint name="joint_rl" type="hinge" axis="0 1 0" 
-               range="-15 15"/>
+      <body name="leg_rl" pos="-0.04 0.028 0">
+        <joint name="joint_rl" type="hinge" axis="0 1 0"/>
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
-        <geom name="leg_rl_geom" type="capsule" size="0.006 0.02" 
+        <geom name="leg_rl_geom" type="box" size="0.008 0.003 0.02" 
               pos="0 0 -0.02" material="leg_mat"/>
-        <geom name="foot_rl" type="sphere" size="0.007" 
+        <geom name="foot_rl" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat"
               friction="1.0 0.005 0.001"/>
       </body>
 
       <!-- REAR-RIGHT LEG -->
-      <body name="leg_rr" pos="-0.04 -0.025 -0.0125">
-        <joint name="joint_rr" type="hinge" axis="0 1 0" 
-               range="-15 15"/>
+      <body name="leg_rr" pos="-0.04 -0.028 0">
+        <joint name="joint_rr" type="hinge" axis="0 1 0"/>
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
-        <geom name="leg_rr_geom" type="capsule" size="0.006 0.02" 
+        <geom name="leg_rr_geom" type="box" size="0.008 0.003 0.02" 
               pos="0 0 -0.02" material="leg_mat"/>
-        <geom name="foot_rr" type="sphere" size="0.007" 
+        <geom name="foot_rr" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat"
               friction="1.0 0.005 0.001"/>
       </body>
