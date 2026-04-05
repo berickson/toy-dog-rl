@@ -41,7 +41,7 @@
   -->
   <default>
     <joint damping="0.02" armature="0.01"/>
-    <geom friction="0.8 0.005 0.001" condim="3" rgba="0.6 0.6 0.6 1"/>
+    <geom friction="0.8 0.005 0.001" condim="3"/>
     <motor ctrllimited="true" ctrlrange="-1 1"/>
   </default>
 
@@ -52,6 +52,10 @@
   <asset>
     <material name="body_mat" rgba="0.3 0.3 0.35 1"/>
     <material name="leg_mat" rgba="0.8 0.4 0.2 1"/>
+    <material name="leg_fl_mat" rgba="0.9 0.2 0.2 1"/>  <!-- FL = red -->
+    <material name="leg_fr_mat" rgba="0.2 0.6 0.9 1"/>  <!-- FR = blue -->
+    <material name="leg_rl_mat" rgba="0.2 0.8 0.2 1"/>  <!-- RL = green -->
+    <material name="leg_rr_mat" rgba="0.9 0.8 0.1 1"/>  <!-- RR = yellow -->
     <material name="foot_mat" rgba="0.2 0.2 0.2 1"/>
     <material name="ground_mat" rgba="0.9 0.9 0.85 1"/>
   </asset>
@@ -132,7 +136,7 @@
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
         <geom name="leg_fl_geom" type="box" size="0.008 0.003 0.02" 
-              pos="0 0 -0.02" material="leg_mat"/>
+              pos="0 0 -0.02" material="leg_fl_mat"/>
         <geom name="foot_fl" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat" 
               friction="1.0 0.005 0.001"/>
@@ -144,7 +148,7 @@
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
         <geom name="leg_fr_geom" type="box" size="0.008 0.003 0.02" 
-              pos="0 0 -0.02" material="leg_mat"/>
+              pos="0 0 -0.02" material="leg_fr_mat"/>
         <geom name="foot_fr" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat"
               friction="1.0 0.005 0.001"/>
@@ -156,7 +160,7 @@
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
         <geom name="leg_rl_geom" type="box" size="0.008 0.003 0.02" 
-              pos="0 0 -0.02" material="leg_mat"/>
+              pos="0 0 -0.02" material="leg_rl_mat"/>
         <geom name="foot_rl" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat"
               friction="1.0 0.005 0.001"/>
@@ -168,7 +172,7 @@
         <inertial pos="0 0 -0.02" mass="0.008" 
                   diaginertia="0.0000005 0.0000005 0.0000001"/>
         <geom name="leg_rr_geom" type="box" size="0.008 0.003 0.02" 
-              pos="0 0 -0.02" material="leg_mat"/>
+              pos="0 0 -0.02" material="leg_rr_mat"/>
         <geom name="foot_rr" type="sphere" size="0.005" 
               pos="0 0 -0.04" material="foot_mat"
               friction="1.0 0.005 0.001"/>

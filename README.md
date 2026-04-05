@@ -4,6 +4,39 @@ Sim-to-real reinforcement learning for a RapidPower Mini robot dog (JXD-8002-TV1
 
 Train a locomotion policy in MuJoCo, deploy on ESP32-S3 + MPU6050.
 
+This is mainly a learning exercise for me. I am collaborating with AI to build RL into the robot and understand RL concepts.
+
+## Goals
+Train the dog to
+locomotion:
+- walk with standard walking gaits
+- walk with "rolling arm" walking gates
+- turn
+- respond to obstacles and failures
+
+tricks:
+- roll over
+- sit
+- dance
+
+Remote control
+- be controlled with a remote control to both roam around and do tricks
+
+## Getting Started
+### Install and set environment
+```
+conda env create -f environment.yml
+conda activate toy-dog-rl
+
+###  Run the simulation
+```bash
+python -m mujoco.viewer --mjcf models/robot_dog.xml
+```
+### Run the controller
+```bash
+python test_controller.py
+```
+
 ## Structure
 
 - `models/` — MJCF robot model for MuJoCo
@@ -13,9 +46,10 @@ Train a locomotion policy in MuJoCo, deploy on ESP32-S3 + MPU6050.
 
 ## Hardware
 
-- 4 legs, 1 DOF each (fore-aft swing, ~20° arc)
+- RapidPower Mini Remote Control Pet
+- 4 legs, 1 DOF each (360° controllable)
 - Bang-bang DC motors (upgrade to PWM via DRV8833 planned)
-- Potentiometers for joint position feedback
+- Potentiometers for joint position feedback (with dead zone)
 - MPU6050 IMU for body orientation
 - ESP32-S3 running policy inference at ~50Hz
 

@@ -6,3 +6,14 @@ dependencies:
   - pip
   - pip:
     - mujoco
+    - gymnasium
+    - stable-baselines3[extra]
+    - tensorboard
+    - gymnasium
+    - stable-baselines3[extra]   # PPO + tensorboard logging
+    - tensorboard                 # training visualization
+    - onnx                        # policy export
+    - onnxruntime                 # policy inference (also used on ESP32 side)
+    # --- Linux/4090 only (install manually on that machine) ---
+    # - jax[cuda12]
+    # - mujoco-mjx
