@@ -11,3 +11,7 @@ dependencies:
     - tensorboard
     - onnx
     - onnxruntime
+    - jax[cuda12]
+    - mujoco-mjx
+    - flax
+    - optax

@@ -15,23 +15,57 @@ Goal: hold torso at a target height, level and still.
 
 What you learn: reward shaping, training loop, debugging sim behavior.
 
-## Phase 2: Walk (command-conditioned)
-**Status: in progress**
+## Phase 2: Walk (command-conditioned, incremental)
+**Status: in progress — Phase 2a**
 
-Goal: follow a commanded velocity and yaw rate.
+Goal: follow commanded velocity, yaw rate, and posture/gait parameters.
 
-- Observation: 14 sensors + 2 commands = 16 dims
-- Commands: `[vx_cmd, yaw_rate_cmd]` (randomized each episode)
-  - `vx_cmd`: -0.05 to 0.05 m/s (forward/backward)
-  - `yaw_rate_cmd`: -0.5 to 0.5 rad/s (turning)
-  - Note: `vy_cmd` omitted — robot has Y-axis hinges only, can't strafe
-- Reward: vx tracking (gaussian) + yaw tracking (gaussian) + height maintenance - tilt - energy
-- Termination: body falls, or max steps
+### Observation: 20 dims (fixed network shape throughout)
 
-This single policy handles forward, backward, turning, and stopping
-(command = zero). Turning falls out of yaw_rate tracking for free.
+| Index  | Signal             | When enabled         |
+|--------|--------------------|----------------------|
+| 0–3    | joint positions    | always               |
+| 4–7    | joint velocities   | always               |
+| 8–10   | gyro               | always               |
+| 11–13  | accelerometer      | always               |
+| 14     | `vx_cmd`           | Phase 2a             |
+| 15     | `yaw_rate_cmd`     | Phase 2b             |
+| 16     | `height_cmd`       | Phase 2c             |
+| 17     | `pitch_cmd`        | Phase 2c             |
+| 18     | `stride_freq_cmd`  | Phase 2d             |
+| 19     | `stride_height_cmd`| Phase 2d             |
 
-What you learn: command conditioning, gait emergence, domain randomization.
+- Action: 4 motor torques in [-1, 1]
+- Unused command inputs are fixed at 0 until their phase begins
+- Network shape never changes — no retraining from scratch between phases
+
+### Phase 2a: Fixed forward speed ← current
+- `vx_cmd` = 0.03 m/s (fixed, not randomized yet)
+- All other commands = 0
+- Reward: vx Gaussian tracking + one-sided height + uprightness - tilt - energy - smoothness - leg limit
+- Once gait is stable, start randomizing `vx_cmd` in [-0.05, 0.05] range
+
+### Phase 2b: Add yaw rate
+- Resume from 2a weights
+- Start rewarding `yaw_rate_cmd` tracking (Gaussian)
+- `yaw_rate_cmd`: randomized [-0.5, 0.5] rad/s per episode
+
+### Phase 2c: Add posture commands
+- Resume from 2b weights
+- `height_cmd`: target body ride height (crouch vs tall)
+- `pitch_cmd`: forward/back lean
+
+### Phase 2d: Add gait parameters
+- Resume from 2c weights
+- `stride_freq_cmd`: step frequency (slow deliberate vs fast trot)
+- `stride_height_cmd`: foot lift height (high step vs shuffle)
+- Note: limited by 1-DOF legs — may not be fully controllable
+
+Each sub-phase resumes from the previous weights and only enables
+the new command input + reward term. The fixed 20-dim observation
+means the network shape is stable across all phases.
+
+What you learn: command conditioning, incremental training, gait emergence.
 
 ## Phase 3: Tricks (separate policies)
 

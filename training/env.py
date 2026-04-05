@@ -1,11 +1,17 @@
 """
 RobotDogEnv — Gymnasium environment for the toy dog MuJoCo model.
 
-Observation (14 values):
+Observation (20 values):
   [0:4]   joint positions   FL, FR, RL, RR  (radians)
   [4:8]   joint velocities  FL, FR, RL, RR  (rad/s)
   [8:11]  gyroscope         wx, wy, wz       (rad/s)
   [11:14] accelerometer     ax, ay, az       (m/s²)
+  [14]    vx_cmd            forward speed command
+  [15]    yaw_rate_cmd      yaw rate command
+  [16]    height_cmd        target height command
+  [17]    pitch_cmd         body pitch command
+  [18]    stride_freq_cmd   stride frequency command
+  [19]    stride_height_cmd stride height command
 
 Action (4 values):
   Motor torque commands in [-1, 1], one per leg (FL, FR, RL, RR).
@@ -42,12 +48,17 @@ _MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "robot_dog
 
 # Observation size and bounds.
 _SENSOR_DIM = 14
+_N_COMMANDS = 6
+_OBS_DIM = _SENSOR_DIM + _N_COMMANDS  # 20
 _SENSOR_HIGH = (
     [2 * np.pi] * 4    # joint pos (unbounded in practice, generous limit)
     + [50.0] * 4       # joint vel  (rad/s)
     + [20.0] * 3       # gyro       (rad/s)
     + [30.0] * 3       # accel      (m/s² — includes gravity ~9.81)
 )
+# Command bounds: [vx, yaw_rate, height, pitch, stride_freq, stride_height]
+_COMMAND_HIGH = [1.0, 3.0, 0.1, 1.0, 5.0, 0.05]
+_OBS_HIGH = _SENSOR_HIGH + _COMMAND_HIGH
 
 
 class RobotDogEnv(gym.Env):
@@ -61,7 +72,7 @@ class RobotDogEnv(gym.Env):
         max_steps=1000,
         task="stand",
         ctrl_dt=0.02,          # policy runs at 50 Hz (every 0.02s of sim time)
-        forward_reward_w=1.0,  # weight on forward velocity reward
+        forward_reward_w=2.0,  # weight on forward velocity reward
         tilt_penalty_w=4.0,    # weight on tilt penalty
         energy_penalty_w=0.01, # weight on energy penalty
         height_reward_w=4.0,   # stand task: reward for staying near target height
@@ -71,8 +82,12 @@ class RobotDogEnv(gym.Env):
         push_interval=50,      # apply a random push every N steps (0=disabled)
         push_force=0.05,       # max force of random pushes (Newtons)
         # Walk task
+        target_vx=0.05,                   # walk task: target forward velocity (m/s)
+        vx_sigma=0.01,                    # walk task: Gaussian tracking width
         walk_height_penalty_w=2.0,         # walk task: stay near target height
         smoothness_penalty_w=0.1,          # penalize action changes between steps
+        leg_limit=0.35,                    # walk task: max leg angle from vertical (rad, ~20°)
+        leg_limit_penalty_w=2.0,           # walk task: penalty weight for exceeding leg limit
     ):
         super().__init__()
 
@@ -89,8 +104,12 @@ class RobotDogEnv(gym.Env):
         self.min_height = min_height
         self.push_interval = push_interval
         self.push_force = push_force
+        self.target_vx = target_vx
+        self.vx_sigma = vx_sigma
         self.walk_height_penalty_w = walk_height_penalty_w
         self.smoothness_penalty_w = smoothness_penalty_w
+        self.leg_limit = leg_limit
+        self.leg_limit_penalty_w = leg_limit_penalty_w
 
         self._prev_action = np.zeros(4)
 
@@ -108,7 +127,7 @@ class RobotDogEnv(gym.Env):
         self._sensor_info = self._build_sensor_cache()
 
         # Gymnasium spaces.
-        obs_high = np.array(_SENSOR_HIGH, dtype=np.float32)
+        obs_high = np.array(_OBS_HIGH, dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-obs_high, high=obs_high, dtype=np.float32
         )
@@ -151,6 +170,10 @@ class RobotDogEnv(gym.Env):
         self._step_count = 0
         self._prev_x = self.data.qpos[0]  # track forward progress
         self._prev_action = np.zeros(self.model.nu)
+
+        # Phase 2a: fixed commands (vx=target_vx, rest=0).
+        self._commands = np.zeros(_N_COMMANDS, dtype=np.float32)
+        self._commands[0] = self.target_vx
 
         obs = self._get_obs()
         info = {}
@@ -202,7 +225,7 @@ class RobotDogEnv(gym.Env):
     # ------------------------------------------------------------------
 
     def _get_obs(self):
-        """Build the 14-dim observation vector from sensordata."""
+        """Build the 20-dim observation vector from sensordata + commands."""
         s = self._sensor_info
         return np.concatenate([
             self.data.sensordata[s["pos_fl"]:s["pos_fl"] + 1],
@@ -215,6 +238,7 @@ class RobotDogEnv(gym.Env):
             self.data.sensordata[s["vel_rr"]:s["vel_rr"] + 1],
             self.data.sensordata[s["body_gyro"]:s["body_gyro"] + 3],
             self.data.sensordata[s["body_acc"]:s["body_acc"] + 3],
+            self._commands,
         ], dtype=np.float32)
 
     def _compute_reward(self, action):
@@ -232,16 +256,19 @@ class RobotDogEnv(gym.Env):
           - energy_penalty_w      * sum(action^2)
           - smoothness_penalty_w  * sum((action - prev_action)^2)
         """
-        # Forward velocity.
+        # Forward velocity — Gaussian tracking reward centered on target_vx.
         curr_x = self.data.qpos[0]
         dx = curr_x - self._prev_x
         self._prev_x = curr_x
         vx = dx / self.ctrl_dt
-        forward_reward = self.forward_reward_w * vx
+        vx_err = vx - self.target_vx
+        forward_reward = self.forward_reward_w * float(np.exp(-(vx_err ** 2) / (2 * self.vx_sigma ** 2)))
 
-        # Height maintenance — don't fall while walking.
+        # Height reward — full reward at or above target, drops off below.
         body_z = float(self.data.qpos[2])
-        height_penalty = self.walk_height_penalty_w * (body_z - self.target_height) ** 2
+        height_err = min(body_z - self.target_height, 0.0)  # only penalize below target
+        height_sigma = 0.0004
+        height_reward = self.walk_height_penalty_w * float(np.exp(-(height_err ** 2) / height_sigma))
 
         # Tilt penalty from torso orientation.
         quat = self.data.qpos[3:7]  # [qw, qx, qy, qz]
@@ -256,14 +283,19 @@ class RobotDogEnv(gym.Env):
         smoothness_penalty = self.smoothness_penalty_w * float(np.sum(action_delta ** 2))
         self._prev_action = action.copy()
 
-        reward = float(forward_reward - height_penalty - tilt_penalty
-                       - energy_penalty - smoothness_penalty)
+        # Penalize leg angles beyond ~20° from vertical.
+        joint_angles = self.data.qpos[7:11]
+        excess = np.maximum(np.abs(joint_angles) - self.leg_limit, 0.0)
+        leg_limit_penalty = self.leg_limit_penalty_w * float(np.sum(excess ** 2))
+
+        reward = float(forward_reward + height_reward - tilt_penalty
+                       - energy_penalty - smoothness_penalty - leg_limit_penalty)
 
         info = {
             "task": "walk",
             "vx": vx,
             "body_z": body_z,
-            "height_penalty": height_penalty,
+            "height_reward": height_reward,
             "roll": roll,
             "pitch": pitch,
             "tilt_penalty": tilt_penalty,

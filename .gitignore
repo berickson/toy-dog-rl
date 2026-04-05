@@ -1,6 +1,7 @@
 # Training outputs (large, regenerable)
 checkpoints/
 logs/
+logs_mjx/
 policies/
 
 # Python

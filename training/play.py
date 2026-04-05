@@ -133,6 +133,10 @@ def main():
 
     env.close()
 
+    # Force-exit to avoid segfault in MuJoCo viewer GL teardown on Linux.
+    if not args.no_render:
+        os._exit(0)
+
 
 if __name__ == "__main__":
     main()

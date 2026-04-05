@@ -37,6 +37,35 @@ python -m mujoco.viewer --mjcf models/robot_dog.xml
 python test_controller.py
 ```
 
+## Train
+cpu
+```bash
+python -m training.train --task stand --timesteps 200000 --n-envs 16
+```
+<br/>
+
+gpu
+```bash
+python -m training_mjx.train --task stand --timesteps 200000 --n-envs 16
+```
+
+
+### Run Tensorboard
+```bash
+tensorboard --logdir logs/
+```
+
+### Run model in simulator
+cpu
+```
+python -m training.play --episodes 10 --max-steps 1000 --task walk
+```
+<br/>
+gpu
+```
+python -m training_mjx.play --episodes 10 --max-steps 1000 --task walk
+```
+
 ## Structure
 
 - `models/` — MJCF robot model for MuJoCo
